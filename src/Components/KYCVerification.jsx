@@ -22,6 +22,8 @@ export default function KYCVerification() {
       headers: {
         Authorization: `Bearer ${userToken}`,
       },
+        credentials: 'include', 
+
     });
 
     const data = await res.json();
