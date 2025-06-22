@@ -72,81 +72,163 @@ export default function KYCVerification() {
     }
   };
 
+  // const launchWebSdk = async () => {
+  //   try {
+  //     setLoading(true);
+  //     const token = await getNewAccessToken();
+
+  //     if (!containerRef.current) {
+  //       console.error('KYC container not found in DOM');
+  //       toast.error('KYC container not available. Please refresh.');
+  //       setLoading(false);
+  //       return;
+  //     }
+
+  //     const sdk = snsWebSdk
+  //       .init(token, getNewAccessToken)
+  //       .withConf({
+  //         lang: 'en',
+  //         theme: 'dark',
+  //       })
+  //       .withOptions({
+  //         addViewportTag: false,
+  //         adaptIframeHeight: true,
+  //       })
+  //       .on('idCheck.onStepCompleted', (payload) => {
+  //         console.log('Step completed:', payload);
+  //       })
+  //       .on('idCheck.onError', (error) => {
+  //         console.error('SDK error:', error);
+  //         toast.error(`KYC Error: ${error.message || JSON.stringify(error)}`);
+  //       })
+  //       .on('idCheck.onApplicantLoaded', (payload) => {
+  //         console.log('Applicant Loaded:', payload);
+  //         if (payload.applicantId) {
+  //           sessionStorage.setItem('currentApplicantId', payload.applicantId);
+  //         }
+  //       })
+  //       .on('idCheck.onApplicantStatusChanged', async (payload) => {
+  //         console.log('Status Changed:', payload);
+  //         const applicantId = sessionStorage.getItem('currentApplicantId') || payload.applicantId;
+
+  //         if (applicantId && payload.reviewResult) {
+  //           await saveKycStatus(applicantId, {
+  //             reviewId: payload.reviewId,
+  //             attemptId: payload.attemptId,
+  //             attemptCnt: payload.attemptCnt,
+  //             levelName: payload.levelName,
+  //             reviewStatus: payload.reviewStatus,
+  //             reviewResult: payload.reviewResult,
+  //             reviewDate: payload.reviewDate,
+  //             createDate: payload.createDate,
+  //             priority: payload.priority,
+  //             reprocessing: payload.reprocessing,
+  //             elapsedSincePendingMs: payload.elapsedSincePendingMs,
+  //             elapsedSinceQueuedMs: payload.elapsedSinceQueuedMs,
+  //           });
+
+  //           const answer = payload.reviewResult.reviewAnswer;
+  //           if (answer === 'GREEN') toast.success('KYC Completed ✅');
+  //           else if (answer === 'RED') toast.error('KYC Failed ❌');
+  //           else if (answer === 'YELLOW') toast.warning('KYC Under Review ⚠️');
+  //         }
+  //       })
+  //       .onMessage((type, payload) => {
+  //         console.log('SDK message:', type, payload);
+  //       })
+  //       .build();
+
+  //     sdk.launch(containerRef.current);
+  //     sdkInstanceRef.current = sdk;
+  //     setLoading(false);
+  //   } catch (error) {
+  //     console.error('KYC setup error:', error);
+  //     setLoading(false);
+  //     toast.error(`KYC Setup Error: ${error.message || error}`);
+  //   }
+  // };
+
+
   const launchWebSdk = async () => {
-    try {
-      setLoading(true);
-      const token = await getNewAccessToken();
+  try {
+    setLoading(true);
+    console.log('🔄 Getting KYC token...');
+    const token = await getNewAccessToken();
+    console.log('✅ Got KYC token:', token);
 
-      if (!containerRef.current) {
-        console.error('KYC container not found in DOM');
-        toast.error('KYC container not available. Please refresh.');
-        setLoading(false);
-        return;
-      }
-
-      const sdk = snsWebSdk
-        .init(token, getNewAccessToken)
-        .withConf({
-          lang: 'en',
-          theme: 'dark',
-        })
-        .withOptions({
-          addViewportTag: false,
-          adaptIframeHeight: true,
-        })
-        .on('idCheck.onStepCompleted', (payload) => {
-          console.log('Step completed:', payload);
-        })
-        .on('idCheck.onError', (error) => {
-          console.error('SDK error:', error);
-          toast.error(`KYC Error: ${error.message || JSON.stringify(error)}`);
-        })
-        .on('idCheck.onApplicantLoaded', (payload) => {
-          console.log('Applicant Loaded:', payload);
-          if (payload.applicantId) {
-            sessionStorage.setItem('currentApplicantId', payload.applicantId);
-          }
-        })
-        .on('idCheck.onApplicantStatusChanged', async (payload) => {
-          console.log('Status Changed:', payload);
-          const applicantId = sessionStorage.getItem('currentApplicantId') || payload.applicantId;
-
-          if (applicantId && payload.reviewResult) {
-            await saveKycStatus(applicantId, {
-              reviewId: payload.reviewId,
-              attemptId: payload.attemptId,
-              attemptCnt: payload.attemptCnt,
-              levelName: payload.levelName,
-              reviewStatus: payload.reviewStatus,
-              reviewResult: payload.reviewResult,
-              reviewDate: payload.reviewDate,
-              createDate: payload.createDate,
-              priority: payload.priority,
-              reprocessing: payload.reprocessing,
-              elapsedSincePendingMs: payload.elapsedSincePendingMs,
-              elapsedSinceQueuedMs: payload.elapsedSinceQueuedMs,
-            });
-
-            const answer = payload.reviewResult.reviewAnswer;
-            if (answer === 'GREEN') toast.success('KYC Completed ✅');
-            else if (answer === 'RED') toast.error('KYC Failed ❌');
-            else if (answer === 'YELLOW') toast.warning('KYC Under Review ⚠️');
-          }
-        })
-        .onMessage((type, payload) => {
-          console.log('SDK message:', type, payload);
-        })
-        .build();
-
-      sdk.launch(containerRef.current);
-      sdkInstanceRef.current = sdk;
-      setLoading(false);
-    } catch (error) {
-      console.error('KYC setup error:', error);
-      setLoading(false);
-      toast.error(`KYC Setup Error: ${error.message || error}`);
+    // Retry waiting for containerRef to be available
+    let retries = 0;
+    while (!containerRef.current && retries < 10) {
+      console.warn('⏳ Waiting for containerRef to load...');
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      retries++;
     }
-  };
+
+    if (!containerRef.current) {
+      console.error('❌ KYC container not found after retries');
+      toast.error('KYC container not ready. Please refresh.');
+      setLoading(false);
+      return;
+    }
+
+    const sdk = snsWebSdk
+      .init(token, getNewAccessToken)
+      .withConf({ lang: 'en', theme: 'dark' })
+      .withOptions({ addViewportTag: false, adaptIframeHeight: true })
+      .on('idCheck.onStepCompleted', (payload) => {
+        console.log('Step completed:', payload);
+      })
+      .on('idCheck.onError', (error) => {
+        console.error('SDK error:', error);
+        toast.error(`KYC Error: ${error.message || JSON.stringify(error)}`);
+      })
+      .on('idCheck.onApplicantLoaded', (payload) => {
+        console.log('Applicant Loaded:', payload);
+        if (payload.applicantId) {
+          sessionStorage.setItem('currentApplicantId', payload.applicantId);
+        }
+      })
+      .on('idCheck.onApplicantStatusChanged', async (payload) => {
+        console.log('Status Changed:', payload);
+        const applicantId = sessionStorage.getItem('currentApplicantId') || payload.applicantId;
+
+        if (applicantId && payload.reviewResult) {
+          await saveKycStatus(applicantId, {
+            reviewId: payload.reviewId,
+            attemptId: payload.attemptId,
+            attemptCnt: payload.attemptCnt,
+            levelName: payload.levelName,
+            reviewStatus: payload.reviewStatus,
+            reviewResult: payload.reviewResult,
+            reviewDate: payload.reviewDate,
+            createDate: payload.createDate,
+            priority: payload.priority,
+            reprocessing: payload.reprocessing,
+            elapsedSincePendingMs: payload.elapsedSincePendingMs,
+            elapsedSinceQueuedMs: payload.elapsedSinceQueuedMs,
+          });
+
+          const answer = payload.reviewResult.reviewAnswer;
+          if (answer === 'GREEN') toast.success('KYC Completed ✅');
+          else if (answer === 'RED') toast.error('KYC Failed ❌');
+          else if (answer === 'YELLOW') toast.warning('KYC Under Review ⚠️');
+        }
+      })
+      .onMessage((type, payload) => {
+        console.log('SDK message:', type, payload);
+      })
+      .build();
+
+    sdk.launch(containerRef.current);
+    sdkInstanceRef.current = sdk;
+
+    setLoading(false);
+  } catch (error) {
+    console.error('❌ KYC setup error:', error);
+    toast.error(`KYC Setup Error: ${error.message || error}`);
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     launchWebSdk();
