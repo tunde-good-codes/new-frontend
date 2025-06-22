@@ -3,13 +3,38 @@ import snsWebSdk from '@sumsub/websdk';
 import Modal from '../Components/UI/Modal';
 import { toast } from 'react-toastify';
 
+class ErrorBoundary extends React.Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 bg-blue-800 min-h-screen flex items-center justify-center">
+          <div className="text-white bg-red-500 p-4 rounded">
+            KYC verification failed to load. Please refresh the page.
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function KYCVerification() {
   const containerRef = useRef(null);
   const sdkInstanceRef = useRef(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [initError, setInitError] = useState(null);
 
-  // Function to fetch a new access token from your backend
   const getNewAccessToken = async () => {
     const userToken = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!userToken) {
@@ -45,7 +70,7 @@ export default function KYCVerification() {
       const payload = {
         applicantId,
         statusData,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       };
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/kyc/status`, {
@@ -54,16 +79,13 @@ export default function KYCVerification() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${userToken}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
 
-      const result = await response.json();
 
       if (response.ok) {
-        console.log(result);
         toast.success('KYC verification status updated!');
       } else {
-        console.error(result);
         toast.error('Failed to update KYC status');
       }
     } catch (error) {
@@ -72,166 +94,101 @@ export default function KYCVerification() {
     }
   };
 
-  // const launchWebSdk = async () => {
-  //   try {
-  //     setLoading(true);
-  //     const token = await getNewAccessToken();
-
-  //     if (!containerRef.current) {
-  //       console.error('KYC container not found in DOM');
-  //       toast.error('KYC container not available. Please refresh.');
-  //       setLoading(false);
-  //       return;
-  //     }
-
-  //     const sdk = snsWebSdk
-  //       .init(token, getNewAccessToken)
-  //       .withConf({
-  //         lang: 'en',
-  //         theme: 'dark',
-  //       })
-  //       .withOptions({
-  //         addViewportTag: false,
-  //         adaptIframeHeight: true,
-  //       })
-  //       .on('idCheck.onStepCompleted', (payload) => {
-  //         console.log('Step completed:', payload);
-  //       })
-  //       .on('idCheck.onError', (error) => {
-  //         console.error('SDK error:', error);
-  //         toast.error(`KYC Error: ${error.message || JSON.stringify(error)}`);
-  //       })
-  //       .on('idCheck.onApplicantLoaded', (payload) => {
-  //         console.log('Applicant Loaded:', payload);
-  //         if (payload.applicantId) {
-  //           sessionStorage.setItem('currentApplicantId', payload.applicantId);
-  //         }
-  //       })
-  //       .on('idCheck.onApplicantStatusChanged', async (payload) => {
-  //         console.log('Status Changed:', payload);
-  //         const applicantId = sessionStorage.getItem('currentApplicantId') || payload.applicantId;
-
-  //         if (applicantId && payload.reviewResult) {
-  //           await saveKycStatus(applicantId, {
-  //             reviewId: payload.reviewId,
-  //             attemptId: payload.attemptId,
-  //             attemptCnt: payload.attemptCnt,
-  //             levelName: payload.levelName,
-  //             reviewStatus: payload.reviewStatus,
-  //             reviewResult: payload.reviewResult,
-  //             reviewDate: payload.reviewDate,
-  //             createDate: payload.createDate,
-  //             priority: payload.priority,
-  //             reprocessing: payload.reprocessing,
-  //             elapsedSincePendingMs: payload.elapsedSincePendingMs,
-  //             elapsedSinceQueuedMs: payload.elapsedSinceQueuedMs,
-  //           });
-
-  //           const answer = payload.reviewResult.reviewAnswer;
-  //           if (answer === 'GREEN') toast.success('KYC Completed ✅');
-  //           else if (answer === 'RED') toast.error('KYC Failed ❌');
-  //           else if (answer === 'YELLOW') toast.warning('KYC Under Review ⚠️');
-  //         }
-  //       })
-  //       .onMessage((type, payload) => {
-  //         console.log('SDK message:', type, payload);
-  //       })
-  //       .build();
-
-  //     sdk.launch(containerRef.current);
-  //     sdkInstanceRef.current = sdk;
-  //     setLoading(false);
-  //   } catch (error) {
-  //     console.error('KYC setup error:', error);
-  //     setLoading(false);
-  //     toast.error(`KYC Setup Error: ${error.message || error}`);
-  //   }
-  // };
-
-
   const launchWebSdk = async () => {
-  try {
-    setLoading(true);
-    console.log('🔄 Getting KYC token...');
-    const token = await getNewAccessToken();
-    console.log('✅ Got KYC token:', token);
+    try {
+      setLoading(true);
+      setInitError(null);
 
-    // Retry waiting for containerRef to be available
-    let retries = 0;
-    while (!containerRef.current && retries < 10) {
-      console.warn('⏳ Waiting for containerRef to load...');
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      retries++;
-    }
+      // Ensure container exists
+      if (!containerRef.current) {
+        throw new Error('Container element not found');
+      }
 
-    if (!containerRef.current) {
-      console.error('❌ KYC container not found after retries');
-      toast.error('KYC container not ready. Please refresh.');
+      const token = await getNewAccessToken();
+      const userToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const newToken = token || userToken;
+
+      console.log('Before SDK init - container exists?', !!containerRef.current);
+
+      const sdk = snsWebSdk
+        .init(newToken, getNewAccessToken)
+        .withConf({
+          lang: 'en',
+          theme: 'dark',
+        })
+        .withOptions({
+          addViewportTag: false,
+          adaptIframeHeight: true,
+        })
+        .on('idCheck.onStepCompleted', (payload) => {
+          console.log('Step completed:', payload);
+        })
+        .on('idCheck.onError', (error) => {
+          console.error('SDK error:', error);
+          toast.error(`KYC Error: ${error.message || JSON.stringify(error)}`);
+        })
+        .on('idCheck.onApplicantLoaded', (payload) => {
+          console.log('SDK message: idCheck.onApplicantLoaded', payload);
+          if (payload.applicantId) {
+            sessionStorage.setItem('currentApplicantId', payload.applicantId);
+          }
+        })
+        .on('idCheck.onApplicantStatusChanged', async (payload) => {
+          console.log('SDK message: idCheck.onApplicantStatusChanged', payload);
+          const applicantId = sessionStorage.getItem('currentApplicantId') || payload.applicantId;
+          
+          if (applicantId && payload.reviewResult) {
+            await saveKycStatus(applicantId, {
+              reviewId: payload.reviewId,
+              attemptId: payload.attemptId,
+              attemptCnt: payload.attemptCnt,
+              levelName: payload.levelName,
+              reviewStatus: payload.reviewStatus,
+              reviewResult: payload.reviewResult,
+              reviewDate: payload.reviewDate,
+              createDate: payload.createDate,
+              priority: payload.priority,
+              reprocessing: payload.reprocessing,
+              elapsedSincePendingMs: payload.elapsedSincePendingMs,
+              elapsedSinceQueuedMs: payload.elapsedSinceQueuedMs
+            });
+
+            if (payload.reviewResult.reviewAnswer === 'GREEN') {
+              toast.success('KYC Verification Completed Successfully! ✅');
+            } else if (payload.reviewResult.reviewAnswer === 'RED') {
+              toast.error('KYC Verification Failed. Please try again.');
+            } else if (payload.reviewResult.reviewAnswer === 'YELLOW') {
+              toast.warning('KYC Verification is under review.');
+            }
+          }
+        })
+        .onMessage((type, payload) => {
+          console.log('SDK message:', type, payload);
+        })
+        .build();
+
+      console.log('After SDK init - before launch');
+      sdk.launch(containerRef.current); // Use ref directly instead of selector
+      sdkInstanceRef.current = sdk;
+      console.log('After SDK launch');
       setLoading(false);
-      return;
+    } catch (error) {
+      console.error('KYC setup error:', error);
+      setLoading(false);
+      setInitError(error.message);
+      toast.error(`KYC Setup Error: ${error.message || error}`);
     }
-
-    const sdk = snsWebSdk
-      .init(token, getNewAccessToken)
-      .withConf({ lang: 'en', theme: 'dark' })
-      .withOptions({ addViewportTag: false, adaptIframeHeight: true })
-      .on('idCheck.onStepCompleted', (payload) => {
-        console.log('Step completed:', payload);
-      })
-      .on('idCheck.onError', (error) => {
-        console.error('SDK error:', error);
-        toast.error(`KYC Error: ${error.message || JSON.stringify(error)}`);
-      })
-      .on('idCheck.onApplicantLoaded', (payload) => {
-        console.log('Applicant Loaded:', payload);
-        if (payload.applicantId) {
-          sessionStorage.setItem('currentApplicantId', payload.applicantId);
-        }
-      })
-      .on('idCheck.onApplicantStatusChanged', async (payload) => {
-        console.log('Status Changed:', payload);
-        const applicantId = sessionStorage.getItem('currentApplicantId') || payload.applicantId;
-
-        if (applicantId && payload.reviewResult) {
-          await saveKycStatus(applicantId, {
-            reviewId: payload.reviewId,
-            attemptId: payload.attemptId,
-            attemptCnt: payload.attemptCnt,
-            levelName: payload.levelName,
-            reviewStatus: payload.reviewStatus,
-            reviewResult: payload.reviewResult,
-            reviewDate: payload.reviewDate,
-            createDate: payload.createDate,
-            priority: payload.priority,
-            reprocessing: payload.reprocessing,
-            elapsedSincePendingMs: payload.elapsedSincePendingMs,
-            elapsedSinceQueuedMs: payload.elapsedSinceQueuedMs,
-          });
-
-          const answer = payload.reviewResult.reviewAnswer;
-          if (answer === 'GREEN') toast.success('KYC Completed ✅');
-          else if (answer === 'RED') toast.error('KYC Failed ❌');
-          else if (answer === 'YELLOW') toast.warning('KYC Under Review ⚠️');
-        }
-      })
-      .onMessage((type, payload) => {
-        console.log('SDK message:', type, payload);
-      })
-      .build();
-
-    sdk.launch(containerRef.current);
-    sdkInstanceRef.current = sdk;
-
-    setLoading(false);
-  } catch (error) {
-    console.error('❌ KYC setup error:', error);
-    toast.error(`KYC Setup Error: ${error.message || error}`);
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
-    launchWebSdk();
+    const initSdk = async () => {
+      await launchWebSdk();
+    };
+
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      initSdk();
+    });
 
     return () => {
       if (sdkInstanceRef.current) {
@@ -242,9 +199,21 @@ export default function KYCVerification() {
     };
   }, []);
 
-  const handleLogin = () => (window.location.href = '/login');
-  const handleHome = () => (window.location.href = '/');
-  const handleClose = () => setShowLoginModal(false);
+  const handleLogin = () => {
+    window.location.href = '/login';
+  };
+
+  const handleHome = () => {
+    window.location.href = '/';
+  };
+
+  const handleClose = () => {
+    setShowLoginModal(false);
+  };
+
+  const handleRetry = () => {
+    launchWebSdk();
+  };
 
   if (loading) {
     return (
@@ -254,30 +223,69 @@ export default function KYCVerification() {
     );
   }
 
+  if (initError) {
+    return (
+      <div className="p-4 bg-blue-800 min-h-screen flex items-center justify-center">
+        <div className="text-white bg-red-500 p-4 rounded max-w-md text-center">
+          <p className="mb-4">Failed to initialize KYC verification: {initError}</p>
+          <button
+            onClick={handleRetry}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4 bg-blue-800 min-h-screen">
-      {showLoginModal ? (
-        <Modal onClose={handleClose}>
-          <div className="bg-white p-6 rounded-lg max-w-md mx-auto">
-            <h2 className="text-xl font-semibold mb-4">Login Required</h2>
-            <p className="mb-6">Please login first to complete your KYC verification.</p>
-            <div className="flex justify-end space-x-3">
-              <button onClick={handleClose} className="px-4 py-2 border rounded-md hover:bg-gray-50">Close</button>
-              <button onClick={handleHome} className="px-4 py-2 border rounded-md hover:bg-gray-50">Home</button>
-              <button onClick={handleLogin} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Login</button>
+    <ErrorBoundary>
+      <div className="p-4 bg-blue-800 min-h-screen">
+        {showLoginModal ? (
+          <Modal onClose={handleClose}>
+            <div className="bg-white p-6 rounded-lg max-w-md mx-auto">
+              <h2 className="text-xl font-semibold mb-4">Login Required</h2>
+              <p className="mb-6">Please login first to complete your KYC verification.</p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={handleClose}
+                  className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleHome}
+                  className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Home
+                </button>
+                <button
+                  onClick={handleLogin}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Login
+                </button>
+              </div>
             </div>
-          </div>
-        </Modal>
-      ) : (
-        <>
-          <h2 className="text-xl font-semibold mb-4 text-white">KYC Verification</h2>
-          <div
-            ref={containerRef}
-            id="sumsub-websdk-container"
-            style={{ width: '100%', minHeight: '600px', background: 'white' }}
-          ></div>
-        </>
-      )}
-    </div>
+          </Modal>
+        ) : (
+          <>
+            <h2 className="text-xl font-semibold mb-4 text-white">KYC Verification</h2>
+            <div
+              ref={containerRef}
+              id="sumsub-websdk-container"
+              className="sumsub-container"
+              style={{
+                width: '100%',
+                minHeight: '600px',
+                background: 'white',
+                display: 'block'
+              }}
+            ></div>
+          </>
+        )}
+      </div>
+    </ErrorBoundary>
   );
 }
