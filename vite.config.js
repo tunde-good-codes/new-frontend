@@ -13,5 +13,9 @@ export default defineConfig({
     https: false,
     host: "localhost",
     port: 5173,
+
+    headers: {
+    "Content-Security-Policy": "frame-src 'self' https://*.sumsub.com"
+  }
   },
 });
